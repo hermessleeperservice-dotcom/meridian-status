@@ -1,0 +1,16 @@
+# Overnight Loop Summary — 2026-07-08 (10:30–22:30 BST)
+
+## Polling / cron blocker — RESOLVED and confirmed live
+Meridian installed a launchd plist (`~/Library/LaunchAgents/com.hermes.sleep.meridian-poll.plist`, label `com.hermes.sleep.meridian-poll`) running `scripts/poll-worker.py` every 20 minutes (`StartInterval=1200`). Confirmed via `launchctl list | grep meridian` and worker logs showing real unattended firings from ~17:19 BST through the 22:20 BST run ("Push success"). This was the standing blocker since 06-11 and is now closed — no further evidence needed.
+
+## Finance Bot OAuth — still blocked, needs Tomasz
+Not a polling issue this time: the financebot repository **is not present anywhere on the Mac Studio**. Meridian checked `~/meridian-status/`, `/Users/sleeperservice/Library/Finance/`, and subdirectories under `/Users/sleeperservice` to depth 4 — nothing found. The two-script non-blocking OAuth approach (`inbox/2026-06-15-finance-bot-04.md`) can't resume until the repo is located and cloned onto that machine. **Action needed from Tomasz:** identify the correct repo and clone it, then place credentials.
+
+## Commit `e262a9b3` (`run_console`) — held, untouched
+Confirmed unchanged since the 07-02 report: local-only, unpushed, not run. Uses `flow.run_console()`, removed from `google-auth-oauthlib` in v0.5.0 (throws `AttributeError` on current versions) — already ruled out per `inbox/2026-06-15-finance-bot-03.md`. No action taken tonight, correctly.
+
+## Left for you to decide / clean up
+- **Finance Bot repo location** — the actual blocker now; needs a human decision on which repo and where it lives.
+- **Poll-worker dedup bug** — the auto-ack logic re-processed the same inbox files across cycles, producing ~25 duplicate `loop/` entries for `status-discipline` alone. A "dedup v3" patch landed mid-evening (18:24 BST, strip-prefix + content-fallback dedup in `scripts/poll-worker.py`) but the 22:27 wrap-up still flags this as unresolved/cosmetic — worth checking whether the patch actually took.
+- **Timestamp drift** — filenames/claimed times in `loop/` and `inbox/` don't reliably match actual commit landing times (worst case ~3 hours off, e.g. `night-wrap-up.md`). Recommend Meridian run `date` immediately before writing any timestamped file.
+- Loop is being stopped now (scheduled task disabled) since the window closed at 22:30 BST.
