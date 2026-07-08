@@ -65,13 +65,12 @@ def main():
         files = glob.glob(os.path.join(INBOX, "*.md"))
         files = [f for f in files if os.path.basename(f) != "README.md"]
 
-        known_loop_files = set()
-        if os.path.exists(LOOP_DIR):
-            known_loop = glob.glob(os.path.join(LOOP_DIR, "*.md"))
-            known_loop_files = {os.path.basename(f) for f in known_loop}
-
-        # Deduplicate: filter out inbox files that already have a loop/ counterpart
-        new_files = [f for f in files if os.path.basename(f) not in known_loop_files]
+        # Step 2 (continued): build set of existing loop/ ack basenames for potential use by callers
+        # existing loop/ entry's basename (ack files contain the source filename).
+        new_files = [f for f in files if not any(
+            os.path.basename(f) in os.path.basename(lp)
+            for lp in glob.glob(os.path.join(LOOP_DIR, '*.md'))
+        )]
 
         log(f"Found {len(new_files)} new inbox files (out of {len(files)} total):")
 
