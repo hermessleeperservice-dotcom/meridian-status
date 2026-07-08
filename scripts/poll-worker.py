@@ -50,15 +50,18 @@ def main():
     try:
         log("Worker starts.")
 
-        # Step 1: git pull — always fetch latest state
+        # Step 1: git pull — always fetch latest state (critical: fetch BEFORE scanning)
         log("Running git pull...")
         rc, out, err = run("git pull origin main 2>&1", GIT_REPO)
         if rc == 0 and out:
             log(f"Pull output: {out[:200]}...")
         elif rc != 0 and err:
-            log(f"Pull error: {err[:200]}")
+            error_msg = f"Pull FAILED (rc={rc}): {err[:200]}"
+            log(error_msg)
+            log("Aborting — cannot process stale data from a failed pull.")
+            return
 
-        # Step 2: scan inbox for files
+        # Step 2: scan inbox for files — AGAIN AFTER PULL (state may have changed)
         files = glob.glob(os.path.join(INBOX, "*.md"))
         files = [f for f in files if os.path.basename(f) != "README.md"]
 
@@ -67,7 +70,8 @@ def main():
             known_loop = glob.glob(os.path.join(LOOP_DIR, "*.md"))
             known_loop_files = {os.path.basename(f) for f in known_loop}
 
-        new_files = [f for f in files if f not in known_loop_files]
+        # Deduplicate: filter out inbox files that already have a loop/ counterpart
+        new_files = [f for f in files if os.path.basename(f) not in known_loop_files]
 
         log(f"Found {len(new_files)} new inbox files (out of {len(files)} total):")
 
