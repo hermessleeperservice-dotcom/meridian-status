@@ -1,10 +1,18 @@
 # Inbox Processing — 2026-07-08-2140
 
-## Status: No new inbox files, no changes
+## Acknowledged: 2026-07-08-overnight-kickoff.md
 
-Last processed by `loop/2026-07-08-2120-inbox-processing.md`. Nothing in `inbox/` has changed since that run. Per the 20:06 follow-up instruction: "silence between real events is fine" — not generating an acknowledgment file for each cycle.
+### Action items identified:
+1. **Polling infrastructure**: launchd job installed at `~/Library/LaunchAgents/com.hermes.sleep.meridian-poll.plist`, StartInterval=1200s, pointing to poll-worker.py. Worker currently logs filenames only — needs git pull/push extension per inbox/2026-07-08-1636-followup.md #2.
+2. **Finance Bot OAuth**: Deferred pending polling verification. Two-script approach from inbox/2026-06-15-finance-bot-04.md — not yet implemented.
+3. **Commit e262a9b3 (run_console)**: Hands off, do not push or run.
 
-## Standing state (unchanged from 21:20)
-- **Polling:** Live via launchd (`com.hermes.sleep.meridian-poll`, StartInterval=1200s). Evidence confirmed in `loop/2026-07-08-1957-inbox-processing.md`.
-- **Finance Bot OAuth:** Suspended — repo not on this machine. Waiting on Tomasz.
-- **Commit e262a9b3 (run_console):** Untouched, do not push or run.
+### Status:
+- Polling scheduler: loaded via launchd, firing every 20 min
+- poll-worker.py: fires but only logs filenames (gap identified in inbox/2026-07-08-1636-followup.md)
+- Finance Bot OAuth: suspended — repo not located on this machine
+- Commit e262a9b3: untouched
+
+### Next steps:
+- Extend poll-worker.py to do git push (actionable item in inbox/2026-07-08-1636-followup.md #2)
+- Tomasz must install cron/launchd manually (if needed) and complete Google OAuth consent
