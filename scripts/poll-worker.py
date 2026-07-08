@@ -65,12 +65,26 @@ def main():
         files = glob.glob(os.path.join(INBOX, "*.md"))
         files = [f for f in files if os.path.basename(f) != "README.md"]
 
-        # Step 2 (continued): build set of existing loop/ ack basenames for potential use by callers
-        # existing loop/ entry's basename (ack files contain the source filename).
-        new_files = [f for f in files if not any(
-            os.path.basename(f) in os.path.basename(lp)
-            for lp in glob.glob(os.path.join(LOOP_DIR, '*.md'))
-        )]
+        # Deduplicate by comparing source tokens after stripping run-prefixed timestamp prefix.
+        # Also checks file content (first 10 lines) for catch-all acks where the truncated token
+        # doesn't survive stripping in either direction — handles the "inbox-processing" / follow-up ACK patterns
+        # observed on this repo where Claude writes entries that contain source filenames in headers.
+        import re as _re
+        _RUNPREFIX = re.compile(r'^\d{4}-\d{2}-\d{2}-\d{4}-')
+
+        def _stripped(name):
+            return _RUNPREFIX.sub('', name, count=1)
+
+        # Build set of existing loop/ entries keyed by stripped source-token.
+        # Also store the original paths for future writes.
+        _loop_token_map = {}  # stripped_token -> first_seen_path
+        if os.path.exists(LOOP_DIR):
+            for lp in glob.glob(os.path.join(LOOP_DIR, '*.md')):
+                bn = os.path.basename(lp)
+                src = _stripped(bn)
+                _loop_token_map.setdefault(src, lp)
+
+        new_files = [f for f in files if _stripped(os.path.basename(f)) not in _loop_token_map]
 
         log(f"Found {len(new_files)} new inbox files (out of {len(files)} total):")
 
