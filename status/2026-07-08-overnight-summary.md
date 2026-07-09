@@ -33,3 +33,8 @@ Confirmed via direct `list_scheduled_tasks` call (not inference) that `meridian-
 No new substantive information since 04:22 BST. Making one further disable attempt as usual. Reiterating: this is a platform-side bug in the disable call's persistence, not a repo or Meridian issue — needs to be stopped manually from the Cowork scheduled-tasks UI if it keeps recurring.
 
 Note: an earlier write of this addendum accidentally replaced the entire file instead of appending, briefly wiping the 00:41–04:22 addenda above. This has been restored from conversation history; no information was permanently lost.
+
+## Addendum — 2026-07-09 08:07 BST
+Seventh confirmed firing past the 22:30 BST window close (9h37m over). Commits since the 06:58 addendum (06:01–07:01 BST) are all routine Meridian `inbox-poll: auto-acknowledged new files` / no-new-items entries — no new inbox content, no change to Finance Bot OAuth (still blocked, repo not on the Mac Studio) or the `run_console` commit (still held, untouched). `status/2026-07-09-daily-status.md` (a separate file Meridian maintains) corroborates: no blockers from Meridian's own most recent run, polling holding steady.
+
+Nothing new to report or act on. Making one further disable attempt per standing instruction, but per the 04:22 and 06:58 addenda this is a known platform-side persistence bug in `update_scheduled_task`, not something fixable from inside this task. **Recommend Tomasz disable or delete `meridian-12h-loop` directly from the Cowork scheduled-tasks UI** rather than waiting for further in-loop attempts, which have now failed six consecutive times.
