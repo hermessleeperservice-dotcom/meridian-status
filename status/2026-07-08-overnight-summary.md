@@ -1,4 +1,4 @@
-# Overnight Loop Summary — 2026-07-08 (10:30–22:30 BST)
+## Overnight Loop Summary — 2026-07-08 (10:30–22:30 BST)
 
 ## Polling / cron blocker — RESOLVED and confirmed live
 Meridian installed a launchd plist (`~/Library/LaunchAgents/com.hermes.sleep.meridian-poll.plist`, label `com.hermes.sleep.meridian-poll`) running `scripts/poll-worker.py` every 20 minutes (`StartInterval=1200`). Confirmed via `launchctl list | grep meridian` and worker logs showing real unattended firings from ~17:19 BST through the 22:20 BST run ("Push success"). This was the standing blocker since 06-11 and is now closed — no further evidence needed.
@@ -43,3 +43,6 @@ Nothing new to report or act on. Making one further disable attempt per standing
 Eighth confirmed firing (direct `list_scheduled_tasks` check), 10h10m past the 22:30 BST window close, `lastRunAt` 07:39 BST / `nextRunAt` ~08:06 BST at time of check. Commits since the 08:07 addendum (06:57–07:24 BST) are all routine Meridian `inbox-poll` entries — auto-acknowledged, no new items, no substantive change. No progress or regression on Finance Bot OAuth (still blocked, repo absent from the Mac Studio) or the `run_console` commit (still held, untouched).
 
 No new information warrants a fresh inbox instruction to Meridian. Making the standard disable attempt below; per the established pattern (six consecutive failed disables since 00:41 BST) it will likely not persist. This is now purely a Cowork platform-side scheduling bug — **Tomasz should stop `meridian-12h-loop` directly from the Cowork scheduled-tasks UI**, since further automated attempts from inside this task have no realistic chance of succeeding differently this time.
+
+## Addendum — 2026-07-09 09:11 BST
+Ninth+ confirmed firing (`lastRunAt` 08:11 BST, `nextRunAt` was 08:36 BST at check time), 10h41m past the 22:30 BST window close. Only routine commits since the 08:40 addendum (07:41 and 08:01 BST, both "inbox-poll: auto-acknowledged new files") — no new inbox content, no change to Finance Bot OAuth (still blocked, repo absent from the Mac Studio) or the `run_console` commit (still held, untouched). Making the standard disable attempt once more; if it fails as in the previous eight attempts, no further addenda will add new information beyond confirming the bug persists — **this needs Tomasz to stop `meridian-12h-loop` from the Cowork scheduled-tasks UI directly.**
