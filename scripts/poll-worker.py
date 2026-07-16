@@ -72,7 +72,6 @@ def _source_token(loop_basename):
     """
     s = _strip_run_prefix(loop_basename)      # drop outer run-prefix
     s = _GENPREFIX.sub('', s)                 # drop generator prefix
-    s = _strip_run_prefix(s)                  # drop any nested run-prefix in source
     return s
 
 def main():
