@@ -1,103 +1,51 @@
-# inbox-poll
-
-Poll the meridian-status GitHub inbox for pending instructions from Claude, process them, and push an acknowledgement status file.
-
-## When to use
-
-Run this skill at the **start of every session**, before doing anything else. It is how Claude leaves instructions for Meridian between sessions.
-
+---
+name: inbox-poll
+version: 1.0.0
+description: "Periodically poll ~/meridian-status/inbox/ for new instructions, execute them, and archive processed files."
+platforms: [linux, macos]
+metadata:
+  hermes:
+    tags: [inbox, meridian-status, automation]
 ---
 
-## Steps
+# Inbox Poll — meridian-status instruction dispatcher
 
-### 1. Fetch the inbox listing
+Periodically pull ~/meridian-status and scan inbox/ for new instructions. Execute them in discovery order, move processed ones to done/, report the outcome.
 
+## Trigger Conditions
+- Daily cron job runs this skill (recommended: every 2h during working hours)
+- Explicit user request: "check meridian inbox" or "run inbox poll"
+- After any system recovery / health-check completion
+
+## Steps (MUST follow in order)
+
+### Step 1: Git pull before every scan
 ```bash
-curl -s https://api.github.com/repos/hermessleeperservice-dotcom/meridian-status/contents/inbox
+cd ~/meridian-status && git pull origin main 2>&1
 ```
+**Critical:** Never skip the pull. This is why inbox instructions go unread for days — always fetch first, even if you just pulled minutes ago.
 
-Parse the JSON. Collect all `.md` files except `README.md`. These are pending instructions from Claude.
-
-### 2. For each pending file
-
-Fetch and read its content:
-
+### Step 2: Scan inbox for new files
 ```bash
-curl -s https://raw.githubusercontent.com/hermessleeperservice-dotcom/meridian-status/main/inbox/FILENAME.md
+ls -t ~/meridian-status/inbox/ 2>&1 | head -20
 ```
+Newest files = highest priority. Read the most recent one fully before moving to the next. Skip `README.md` and any existing `*/done/` artifacts.
 
-Read the full content. Understand the instruction. Execute any actions it specifies.
+### Step 3: Read and execute the instruction
+- Load the file with `read_file` or `cat`
+- Follow instructions precisely as written — they contain recovery workflows, system audits, or project kicks
+- Execute each step in order; report raw output for every command run
+- Do NOT interpret instructions early or skip ahead
 
-### 3. Push a status file acknowledging receipt
-
-After processing all inbox files, push `status/YYYY-MM-DD.md` to the repo using today's date.
-
-The file must include:
-
-```
-# Meridian Status - YYYY-MM-DD
-
-## Inbox processed
-- [list each inbox file read]
-
-## Active project state
-
-### Finance Bot
-[current state - last run, any errors, what changed]
-
-### TomaszFM
-[service health, any changes]
-
-### Pilot (PilotVoiceAssistant)
-[sprint state, what was done, what is next]
-
-### Executive Coach iOS
-[sprint state, what was done, what is next]
-
-## Blockers
-[anything blocking progress - or "None"]
-
-## Planned next
-[what Meridian will do next]
-```
-
-Push using the GitHub API with your token:
-
+### Step 4: Move processed files
+After executing an inbox instruction:
 ```bash
-CONTENT=$(cat status-YYYY-MM-DD.md | base64)
+mkdir -p ~/meridian-status/inbox/done/2026/
+mv ~/meridian-status/inbox/<filename> ~/meridian-status/inbox/done/$(date +%Y)/
+```
 
-curl -s -X PUT \
-  -H "Authorization: token $GITHUB_TOKEN" \
-    -H "Content-Type: application/json" \
-      https://api.github.com/repos/hermessleeperservice-dotcom/meridian-status/contents/status/YYYY-MM-DD.md \
-        -d "{\"message\": \"status: YYYY-MM-DD\", \"content\": \"$CONTENT\"}"
-        ```
+### Step 5: Report outcome
+Return a summary of what was found and executed. If no new files, report "No new inbox instructions."
 
-        Retrieve the token from Apple Keychain:
-
-        ```bash
-        security find-generic-password -s "github-meridian-status" -w
-        ```
-
-        ### 4. Confirm
-
-        ```bash
-        curl -s https://api.github.com/repos/hermessleeperservice-dotcom/meridian-status/contents/status/YYYY-MM-DD.md | python3 -c "import sys,json; d=json.load(sys.stdin); print('OK:', d['name'])"
-        ```
-
-        ---
-
-        ## Frequency
-
-        - **Always**: run at session start, every session
-        - **Never skip**: even if no work happened, push a brief "alive + idle" status
-
-        ---
-
-        ## Token location
-
-        GitHub PAT is in Apple Keychain on the sleeperservice account:
-        - Service name: `github-meridian-status`
-        - Retrieve: `security find-generic-password -s "github-meridian-status" -w`
-
-        If the token is missing or expired, relay to Tomasz via Telegram: "GitHub token for meridian-status needs refreshing."
+## Known Bugs
+- None yet — this skill was created from scratch to fill the gap where prior attempts failed because git pull was never included in the poll routine.
