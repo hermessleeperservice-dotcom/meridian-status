@@ -32,6 +32,7 @@ Directory layout for user skills:
             └── SKILL.md
 """
 
+import difflib
 import json
 import logging
 import os
@@ -39,6 +40,7 @@ import re
 import shutil
 import tempfile
 import contextvars as _ctxvars
+from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -1239,6 +1241,192 @@ _skill_gate_bypass: "_ctxvars.ContextVar[bool]" = _ctxvars.ContextVar(
 )
 
 
+# =============================================================================
+# Governance self-patch gate (GOVERNANCE.md §2)
+# -----------------------------------------------------------------------------
+# skill_manage must NOT create/modify a skill directly. Every create/edit/patch
+# write_file/remove_file is intercepted and written as a proposal file under
+# <HERMES_HOME>/skills/proposals/<date>-<skill-name>.md. The change is only
+# applied after an explicit authorisation in inbox/ references that proposal
+# filename. Once applied, the live skill file is committed to the governed repo
+# so self-modified skills are visible, not only on local disk.
+# =============================================================================
+
+PROPOSALS_DIR = SKILLS_DIR / "proposals"
+_GOV_AUTHORISED_CACHE: "Optional[set]" = None  # memo of authorised proposal stems
+
+
+def _governance_proposals_dir() -> Path:
+    return PROPOSALS_DIR
+
+
+def _proposal_path_for(name: str, today: str) -> Path:
+    safe = re.sub(r"[^a-z0-9._-]", "-", name.lower())
+    return PROPOSALS_DIR / f"{today}-{safe}.md"
+
+
+def _inbox_dir() -> Path:
+    """Best-effort locate the meridian-status inbox used for authorisations."""
+    candidates = [
+        HERMES_HOME / "meridian-status" / "inbox",
+        Path.home() / "meridian-status" / "inbox",
+        Path.home() / "Documents" / "meridian-status" / "inbox",
+    ]
+    for c in candidates:
+        if c.is_dir():
+            return c
+    # fallback: first inbox-looking dir under HERMES_HOME
+    for c in candidates:
+        if c.parent.exists():
+            return c
+    return candidates[0]
+
+
+def _authorised_proposal_stems() -> set:
+    """Return the set of proposal filename stems explicitly authorised in inbox/.
+    A proposal is authorised when an inbox/ file (any authorisations file) contains
+    a line referencing the proposal filename (with or without the .md extension)."""
+    global _GOV_AUTHORISED_CACHE
+    if _GOV_AUTHORISED_CACHE is not None:
+        return _GOV_AUTHORISED_CACHE
+    stems: set = set()
+    inbox = _inbox_dir()
+    if inbox.is_dir():
+        try:
+            for f in sorted(inbox.glob("*.md")):
+                try:
+                    text = f.read_text(encoding="utf-8", errors="replace")
+                except Exception:
+                    continue
+                # Unconditional: an explicit `proposals/<date>-<name>.md` reference.
+                for m in re.finditer(r"proposals/([0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9._-]+?)\.md", text):
+                    stems.add(m.group(1))
+                # Conditional: a bare `<date>-<name>.md` only counts when the
+                # surrounding line also carries an authorisation verb, so routine
+                # dated references in reports/notes do NOT accidentally authorise.
+                for line in text.splitlines():
+                    low = line.lower()
+                    if not any(v in low for v in ("apply", "authorise", "authorize", "approve", "execute", "authorisation", "authorization")):
+                        continue
+                    for m in re.finditer(r"([0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9._-]+?)\.md", line):
+                        stems.add(m.group(1))
+        except Exception:
+            pass
+    _GOV_AUTHORISED_CACHE = stems
+    return stems
+
+
+def _reset_governance_cache() -> None:
+    global _GOV_AUTHORISED_CACHE
+    _GOV_AUTHORISED_CACHE = None
+
+
+def _build_proposal_body(action, name, today, **kwargs) -> str:
+    lines = ["# Skill proposal — " + name, "",
+             f"- **Date:** {today}",
+             f"- **Skill:** `{name}`",
+             f"- **Action:** `{action}`",
+             ""]
+    content = kwargs.get("content")
+    old = kwargs.get("old_string")
+    new = kwargs.get("new_string")
+    fp = kwargs.get("file_path")
+    fc = kwargs.get("file_content")
+    cat = kwargs.get("category")
+    if cat:
+        lines.append(f"- **Category:** {cat}")
+    if fp:
+        lines.append(f"- **Target file:** `{fp}`")
+    lines.append("")
+    lines.append("## Reason")
+    lines.append("")
+    lines.append("_Author the reason for this change when reviewing._")
+    lines.append("")
+    lines.append("## Risk introduced")
+    lines.append("")
+    lines.append("- new tool access: _assess_")
+    lines.append("- new autonomy: _assess_")
+    lines.append("- new external calls: _assess_")
+    lines.append("")
+    if action in ("create", "edit") and content:
+        lines.append("## New/Full content")
+        lines.append("")
+        lines.append("```markdown")
+        lines.append(content)
+        lines.append("```")
+    if action == "patch" and old is not None:
+        lines.append("## Diff (old -> new)")
+        lines.append("")
+        lines.append("```diff")
+        for d in difflib.unified_diff(
+            old.splitlines(), new.splitlines() if new is not None else [],
+            fromfile="old", tofile="new", lineterm="",
+        ):
+            lines.append(d)
+        lines.append("```")
+    if action in ("write_file",) and fc is not None:
+        lines.append("## File content")
+        lines.append("")
+        lines.append("```")
+        lines.append(fc)
+        lines.append("```")
+    if action in ("remove_file", "delete"):
+        lines.append("## Note")
+        lines.append("")
+        lines.append(f"This proposal {action}s the skill/file. For delete, absorbed_into="
+                     f"{kwargs.get('absorbed_into')!r}.")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _governance_self_patch_gate(action, name, **kwargs) -> Optional[str]:
+    """Intercept skill writes per GOVERNANCE.md §2.
+
+    Returns a JSON tool-result string when the write is staged as a proposal
+    (and must NOT be applied), None when the write is allowed to proceed
+    (either non-write action, or an explicit inbox/ authorisation exists).
+    """
+    if action not in {"create", "edit", "patch", "delete", "write_file", "remove_file"}:
+        return None
+
+    today = date.today().isoformat()
+    proposal_path = _proposal_path_for(name, today)
+
+    # Already authorised for today's proposal file? Then apply (do not re-stage).
+    stems = _authorised_proposal_stems()
+    if proposal_path.stem in stems:
+        return None
+
+    try:
+        PROPOSALS_DIR.mkdir(parents=True, exist_ok=True)
+        body = _build_proposal_body(action, name, today, **kwargs)
+        proposal_path.write_text(body, encoding="utf-8")
+        logger.info("Governance self-patch gate: staged proposal %s (action=%s skill=%s)",
+                    proposal_path, action, name)
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("Governance self-patch gate: failed to write proposal: %s", exc)
+        # Fail closed: refuse to apply if we cannot record the proposal.
+        return tool_error(
+            f"Governance gate: could not write proposal file ({exc}). "
+            f"Refusing to apply change directly. Stage it manually.",
+            success=False,
+        )
+
+    gist = f"{action} skill '{name}'"
+    return json.dumps({
+        "success": True,
+        "staged": True,
+        "governance_gate": "self-patch",
+        "proposal_file": str(proposal_path),
+        "message": (
+            "GOVERNANCE.md §2: skill change staged as a proposal rather than applied. "
+            f"Proposal written to {proposal_path}. It will be applied only after an "
+            "explicit authorisation in inbox/ references this proposal filename."
+        ),
+        "gist": gist,
+    }, ensure_ascii=False)
+
+
 def _apply_skill_write_gate(action, name, **payload_kwargs):
     """Evaluate the skill write gate. Returns a JSON tool-result string when the
     write should NOT proceed (blocked or staged), or None to perform the real
@@ -1320,6 +1508,19 @@ def skill_manage(
     preflight = _background_review_preflight(action, name)
     if preflight is not None:
         return json.dumps(preflight, ensure_ascii=False)
+
+    # GOVERNANCE.md §2 self-patch gate: stage skill writes as proposals instead
+    # of applying them. Only bypassed when an inbox/ authorisation references the
+    # proposal filename (handled inside the gate). This runs before the
+    # write_approval gate so the governance rule always wins.
+    gov_result = _governance_self_patch_gate(
+        action, name, content=content, category=category,
+        file_path=file_path, file_content=file_content,
+        old_string=old_string, new_string=new_string,
+        replace_all=replace_all, absorbed_into=absorbed_into,
+    )
+    if gov_result is not None:
+        return gov_result
 
     # Approval gate: when on, stages the write for review (skills are too large
     # to review inline, so they always stage regardless of origin); when off
