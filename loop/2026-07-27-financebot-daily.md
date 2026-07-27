@@ -6,7 +6,7 @@
 **Video ID:** iYXekmK04oU
 **Video URL:** https://www.youtube.com/watch?v=iYXekmK04oU
 **Stage reached:** upload
-**Last error:** 2026-07-26 14:36:53,151 [ERROR] YouTube auth error: ('invalid_grant: Token has been expired or revoked.', {'error': 'invalid_grant', 'error_description': 'Token has been expired or revoked.'})
+**Last error:** none
 
 ## Log tail
 
