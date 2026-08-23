@@ -1,6 +1,6 @@
-"""Weekly news brief agent.
+"""Daily brief agent.
 
-Reads state from disk, asks Claude to search the web across three standing
+Reads state from disk, asks Claude to search the web across standing
 threads, writes a dated markdown brief, and records what it covered so the
 next run does not repeat itself.
 
@@ -19,12 +19,52 @@ from anthropic import Anthropic
 MODEL = "claude-sonnet-5"
 BRIEFS_DIR = Path("briefs")
 STATE_PATH = BRIEFS_DIR / "state.json"
-STATE_MEMORY = 40  # how many past items to remember
+STATE_MEMORY = 120  # how many past items to remember
+ITEMS = 10
+MAX_SEARCHES = 18
 
+# Threads are framed around outside thinking. The reader is a design director
+# at a UK grocery retailer, so anything about his own employer arrives late and
+# is worthless to him. See EXCLUSIONS.
 THREADS = [
-    "UK AI regulation, especially the Regulating for Growth Bill",
-    "Tesco news of strategic significance",
-    "Retail AI and personalisation trends",
+    "How large organisations are actually adopting AI - adoption evidence, "
+    "failure modes, what changes about how teams work",
+    "Design leadership and organisational design - how design functions are "
+    "structured, levelled, funded and valued inside big companies",
+    "Personalisation, loyalty and customer experience outside the UK grocery "
+    "sector - other categories, other markets, other business models",
+    "UK and EU regulation affecting AI, consumer data and personalisation",
+    "How AI is changing user research and evaluation practice",
+    "Essays that reframe a problem in technology, institutions or "
+    "decision-making, rather than reporting news",
+]
+
+# Named publications, because unguided search drifts to whatever is best
+# optimised for it, which is trade press and vendor announcements.
+SOURCES = [
+    "Stratechery",
+    "One Useful Thing (Ethan Mollick)",
+    "The Diff",
+    "Lenny's Newsletter",
+    "The Pragmatic Engineer",
+    "Noahpinion",
+    "Astral Codex Ten",
+    "The Honest Broker",
+    "Bits about Money and Complex Systems (Patrick McKenzie)",
+    "Import AI",
+    "Interconnects",
+    "Platformer",
+    "Peter Merholz on design organisations",
+    "The Looking Glass (Julie Zhuo)",
+]
+
+EXCLUSIONS = [
+    "Do not report Tesco announcements, press releases, product launches or "
+    "results. The reader works there and knows them before they are public. "
+    "Tesco may only appear when an outside analysis reframes something, and "
+    "then lead with the outside argument rather than the Tesco fact.",
+    "Do not include US political news.",
+    "Do not include vendor marketing or press releases dressed as research.",
 ]
 
 
@@ -45,27 +85,38 @@ def save_state(state):
 
 def build_prompt(covered):
     threads = "\n".join(f"- {t}" for t in THREADS)
+    sources = "\n".join(f"- {s}" for s in SOURCES)
+    exclusions = "\n".join(f"- {e}" for e in EXCLUSIONS)
+
     if covered:
         seen = "\n".join(f"- {c}" for c in covered)
         avoid = (
-            "\n\nYou have already covered the items below in previous weeks. "
+            "\n\nYou have already covered the items below on previous days. "
             "Do not repeat them unless there is a genuine development, and if "
             "so, lead with what changed.\n\n" + seen
         )
     else:
         avoid = ""
 
-    return f"""Search the web for the most significant developments over the past seven days across these threads:
+    return f"""Search the web for the most worthwhile things published in the past few days across these threads:
 
 {threads}
 
-Write a brief of six to eight items. For each item give a bolded one-line headline, one sentence of what happened, and one sentence starting "So what:" giving the implication for a design director working on loyalty and personalisation at a UK grocery retailer.
+Check these publications specifically, alongside general search. They are named because unguided search drifts toward trade press and vendor announcements, which are not what is wanted:
+
+{sources}
+
+Exclusions:
+{exclusions}
+
+Write a brief of {ITEMS} items. For each item give a bolded one-line headline, one or two sentences of what was said or found, and one sentence starting "So what:" giving the implication for a design director who leads a group design function at a UK grocery retailer, covering app, web, loyalty and personalisation, and who is working on how design teams are structured and how AI changes research practice.
 
 Rules:
-- Prioritise substance over volume. Fewer, better items beat padding.
+- Favour argument over announcement. An essay that changes how the reader thinks is worth more than a funding round.
+- Prioritise substance over volume. If you cannot find {ITEMS} worthwhile items, give fewer and say so plainly rather than padding.
 - Link the source for each item.
-- Paraphrase sources in your own words. Do not quote at length.
-- Say plainly if a thread had nothing worth reporting this week rather than inventing filler.
+- Paraphrase in your own words. Do not quote at length.
+- Vary the threads across the brief rather than filling it from one.
 - Do not use semicolons.
 - No preamble and no closing summary. Start with the first item.{avoid}
 
@@ -122,8 +173,14 @@ def main():
     try:
         message = client.messages.create(
             model=MODEL,
-            max_tokens=4000,
-            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 12}],
+            max_tokens=8000,
+            tools=[
+                {
+                    "type": "web_search_20250305",
+                    "name": "web_search",
+                    "max_uses": MAX_SEARCHES,
+                }
+            ],
             messages=[{"role": "user", "content": build_prompt(state["covered"])}],
         )
     except Exception as exc:  # noqa: BLE001 - always leave an artefact
