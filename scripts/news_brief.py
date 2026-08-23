@@ -64,6 +64,7 @@ Write a brief of six to eight items. For each item give a bolded one-line headli
 Rules:
 - Prioritise substance over volume. Fewer, better items beat padding.
 - Link the source for each item.
+- Paraphrase sources in your own words. Do not quote at length.
 - Say plainly if a thread had nothing worth reporting this week rather than inventing filler.
 - Do not use semicolons.
 - No preamble and no closing summary. Start with the first item.{avoid}
@@ -77,9 +78,15 @@ def extract_text(message):
     ).strip()
 
 
+def strip_preamble(body):
+    """Drop any narration before the first bolded headline."""
+    match = re.search(r"^\*\*", body, flags=re.MULTILINE)
+    return body[match.start():] if match else body
+
+
 def split_output(text):
     parts = re.split(r"^-{3}COVERED-{3}\s*$", text, flags=re.MULTILINE)
-    body = parts[0].strip()
+    body = strip_preamble(parts[0].strip())
     covered = []
     if len(parts) > 1:
         covered = [line.strip() for line in parts[1].splitlines() if line.strip()]
@@ -87,10 +94,22 @@ def split_output(text):
 
 
 def write_brief(body, today, ok=True):
+    """Write the dated brief.
+
+    Refuses to overwrite an existing brief with an empty body. A re-run on the
+    same day sees everything as already covered and legitimately produces
+    nothing, which would otherwise destroy that day's good brief.
+    """
     BRIEFS_DIR.mkdir(exist_ok=True)
-    status = "" if ok else " (FAILED)"
     path = BRIEFS_DIR / f"{today}.md"
-    path.write_text(f"# Brief {today}{status}\n\n{body}\n")
+
+    if ok and not body.strip() and path.exists():
+        print(f"Empty result, keeping existing {path}", file=sys.stderr)
+        return path
+
+    status = "" if ok else " (FAILED)"
+    content = body.strip() or "No new developments across the standing threads."
+    path.write_text(f"# Brief {today}{status}\n\n{content}\n")
     return path
 
 
