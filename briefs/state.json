@@ -1,11 +1,21 @@
 {
-  "runs": 4,
+  "runs": 5,
   "covered": [
     "AI Growth Lab sandbox opens its first cohort while the Bill itself stalls in Parliament",
     "Tesco pilots AI agent that plans meals and builds baskets automatically",
     "Tesco's agentic AI leans on 30 years of Clubcard data via Adobe and Mistral",
     "Tesco finally goes nationwide on Uber Eats with Clubcard Prices attached",
     "Sainsbury's pauses facial recognition after wrongly ejecting a loyal customer",
-    "Iceland claims an 80% shrink cut from AI cameras, but the number needs scrutiny"
+    "Iceland claims an 80% shrink cut from AI cameras, but the number needs scrutiny",
+    "Charity Majors says the real AI bottleneck has moved from code to judgment",
+    "Peter Merholz names the real reason design struggles for budget",
+    "Stratechery calls Anthropic's AI Act response a bad idea on principle",
+    "Google's purchase of Spirit Airlines' data treated as evidence that data really is oil",
+    "Noah Smith says AI just had its \"Kasparov moment\" for mathematics",
+    "Ethan Mollick's early Fable tests show what AI-run research analysis actually looks like",
+    "Lenny's second annual sentiment survey finds tech's workforce splitting in two over AI",
+    "The ICO signals a statutory AI code and dedicated agentic-AI guidance are coming",
+    "Hotel loyalty moves from segment-level offers to individual-level AI personalisation",
+    "A rebuttal to the \"95% of AI pilots fail\" number reframes the real lesson as build-versus-buy"
   ]
 }
