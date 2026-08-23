@@ -1,6 +1,6 @@
 """Render the latest brief as a standalone HTML page.
 
-Reads the most recent file in briefs/ and writes site/index.html.
+Reads the most recent NON-EMPTY file in briefs/ and writes site/index.html.
 The page is noindex so it stays out of search results.
 """
 
@@ -26,17 +26,32 @@ h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
 .meta { color: #888; font-size: 0.85rem; margin-bottom: 2.5rem; }
 .item { margin-bottom: 2.25rem; }
 .headline { font-weight: 600; margin-bottom: 0.4rem; }
-.sowhat { border-left: 3px solid #ccc; padding-left: 0.85rem; margin-top: 0.5rem; }
 a { color: #0066cc; }
-.archive { margin-top: 3rem; font-size: 0.85rem; color: #888; }
+.foot { margin-top: 3rem; font-size: 0.85rem; color: #888; }
 """
 
 
+def body_lines(path):
+    """Content lines only, excluding the '# Brief ...' heading and blanks."""
+    return [
+        line.strip()
+        for line in path.read_text().splitlines()
+        if line.strip() and not line.strip().startswith("# ")
+    ]
+
+
 def latest_brief():
+    """Most recent brief that actually has content.
+
+    A run can legitimately produce nothing (everything already covered).
+    Rendering that would blank the page, so walk backwards to the last
+    brief with a body.
+    """
     files = sorted(p for p in BRIEFS_DIR.glob("*.md") if p.name != "README.md")
-    if not files:
-        return None
-    return files[-1]
+    for path in reversed(files):
+        if body_lines(path):
+            return path
+    return None
 
 
 def inline_markdown(text):
@@ -50,29 +65,20 @@ def inline_markdown(text):
     return text
 
 
-def to_html(markdown, date):
-    lines = markdown.splitlines()
+def to_html(path, date):
+    """Render generically.
+
+    Every non-heading line becomes a paragraph. Lines that are entirely bold
+    are treated as headlines. Nothing is dropped for failing to match a
+    pattern, so a formatting change upstream degrades the look rather than
+    silently emptying the page.
+    """
     body = []
-    open_item = False
-
-    for line in lines:
-        stripped = line.strip()
-        if not stripped or stripped.startswith("# "):
-            continue
-
-        if stripped.startswith("**") and stripped.endswith("**"):
-            if open_item:
-                body.append("</div>")
-            body.append('<div class="item">')
-            body.append(f'<div class="headline">{inline_markdown(stripped)}</div>')
-            open_item = True
-        elif stripped.startswith("So what:"):
-            body.append(f'<p class="sowhat">{inline_markdown(stripped)}</p>')
+    for line in body_lines(path):
+        if line.startswith("**") and line.endswith("**"):
+            body.append(f'<p class="headline">{inline_markdown(line)}</p>')
         else:
-            body.append(f"<p>{inline_markdown(stripped)}</p>")
-
-    if open_item:
-        body.append("</div>")
+            body.append(f"<p>{inline_markdown(line)}</p>")
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -87,7 +93,7 @@ def to_html(markdown, date):
 <h1>Weekly brief</h1>
 <div class="meta">{date} &middot; UK AI regulation, Tesco, retail personalisation</div>
 {chr(10).join(body)}
-<div class="archive">Past briefs live in the meridian-status repo.</div>
+<p class="foot">Past briefs live in the meridian-status repo.</p>
 </body>
 </html>
 """
@@ -96,12 +102,12 @@ def to_html(markdown, date):
 def main():
     source = latest_brief()
     if source is None:
-        print("No briefs found", file=sys.stderr)
-        sys.exit(1)
+        print("No brief with content found, leaving page untouched", file=sys.stderr)
+        sys.exit(0)
 
     date = source.stem
     OUT_DIR.mkdir(exist_ok=True)
-    (OUT_DIR / "index.html").write_text(to_html(source.read_text(), date))
+    (OUT_DIR / "index.html").write_text(to_html(source, date))
     print(f"Rendered {source} to {OUT_DIR / 'index.html'}")
 
 
