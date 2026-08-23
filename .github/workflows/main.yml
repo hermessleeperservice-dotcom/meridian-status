@@ -1,0 +1,37 @@
+name: Weekly news brief
+
+on:
+  schedule:
+    - cron: '0 18 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install anthropic
+
+      - env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python scripts/news_brief.py
+
+      - name: Commit output
+        run: |
+          git config user.name "news-brief-agent"
+          git config user.email "actions@github.com"
+          git add briefs/
+          if git diff --staged --quiet; then
+            echo "Nothing to commit"
+          else
+            git commit -m "Brief: $(date -u +%Y-%m-%d)"
+            git push
+          fi
