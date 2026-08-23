@@ -35,3 +35,17 @@ jobs:
             git commit -m "Brief: $(date -u +%Y-%m-%d)"
             git push
           fi
+      - name: Render page
+        run: python scripts/render_page.py
+
+      - name: Publish page
+        env:
+          TOKEN: ${{ secrets.BRIEF_PUBLISH_TOKEN }}
+        run: |
+          git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/hermessleeperservice-dotcom/brief.git" pub
+          cp site/index.html pub/index.html
+          cd pub
+          git config user.name "news-brief-agent"
+          git config user.email "actions@github.com"
+          git add index.html
+          git diff --staged --quiet || (git commit -m "Publish brief" && git push)
