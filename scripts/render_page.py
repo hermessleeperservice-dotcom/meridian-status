@@ -231,7 +231,11 @@ def fetch_og_image(url):
     match = OG_RE.search(head) or OG_ALT_RE.search(head)
     if not match:
         return None
-    image = match.group(1).decode("utf-8", "ignore").strip()
+    # The regex reads raw HTML without a parser, so entities in the
+    # attribute (some sites emit &amp; or &#x3D; inside og:image URLs)
+    # are still literal text here. Decode once so esc() doesn't
+    # re-escape them into garbage when the page is rendered.
+    image = html.unescape(match.group(1).decode("utf-8", "ignore")).strip()
     return image if image.startswith("https://") else None
 
 
