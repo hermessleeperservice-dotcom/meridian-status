@@ -6,6 +6,11 @@ The page is noindex so it stays out of search results.
 Cards are image-led. The image is fetched from each source's own og:image
 tag, the same preview every link unfurl uses. A card without an image still
 renders, so a failed fetch degrades rather than breaks.
+
+Sources are normally written by the agent as a markdown link
+[Publication](https://...). Older/occasional output is a bare URL on its
+own line instead — that's still parsed: the source name falls back to the
+domain, and the URL still drives the image lookup and the "So what" link.
 """
 
 import html
@@ -22,6 +27,8 @@ OUT_DIR = Path("site")
 IMAGE_CACHE = BRIEFS_DIR / "images.json"
 
 LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^\)]+)\)")
+BARE_URL_RE = re.compile(r"https?://\S+")
+TRAILING_PUNCT = ".,;:'\")]"
 OG_RE = re.compile(
     rb"""<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']""", re.I
 )
@@ -106,14 +113,28 @@ body {
 
 .body { padding: 1rem 1.125rem 1.125rem; }
 
+.meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.num {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--signal);
+  flex-shrink: 0;
+}
+
 .source {
   font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.625rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
-  display: block;
-  margin-bottom: 0.5rem;
 }
 
 .card h2 {
@@ -239,6 +260,15 @@ def linkify(text):
     return LINK_RE.sub(r'<a href="\2" rel="noopener">\1</a>', esc(text))
 
 
+def clean_url(url):
+    return url.rstrip(TRAILING_PUNCT)
+
+
+def domain_name(url):
+    host = re.sub(r"^https?://", "", url).split("/")[0]
+    return re.sub(r"^www\.", "", host)
+
+
 def parse_items(lines):
     """Group lines into items keyed off bolded headline lines."""
     items, current = [], None
@@ -258,8 +288,17 @@ def parse_items(lines):
 
 def split_item(item):
     body = " ".join(item["body"]).strip()
+
     sources = LINK_RE.findall(body)
     body = LINK_RE.sub("", body).strip(" /").strip()
+
+    if not sources:
+        # Fall back to bare URLs (e.g. "https://example.com/story") — the
+        # agent doesn't always wrap the source in markdown link syntax.
+        bare = [clean_url(u) for u in BARE_URL_RE.findall(body)]
+        if bare:
+            sources = [(domain_name(u), u) for u in bare]
+            body = BARE_URL_RE.sub("", body).strip()
 
     what, sowhat = body, ""
     match = re.search(r"\bSo what:\s*", body)
@@ -270,9 +309,7 @@ def split_item(item):
     return sources, what, sowhat
 
 
-def render_card(item, images):
-    sources, what, sowhat = split_item(item)
-
+def render_card(item, sources, what, sowhat, images, index=None):
     image = next((images.get(url) for _, url in sources if images.get(url)), None)
     first_url = sources[0][1] if sources else None
 
@@ -289,12 +326,17 @@ def render_card(item, images):
 
     parts.append('<div class="body">')
 
+    meta = []
+    if index is not None:
+        meta.append(f'<span class="num">{index:02d}</span>')
     if sources:
         links = " / ".join(
             f'<a href="{esc(url)}" rel="noopener">{esc(name)}</a>'
             for name, url in sources
         )
-        parts.append(f'<span class="source">{links}</span>')
+        meta.append(f'<span class="source">{links}</span>')
+    if meta:
+        parts.append(f'<div class="meta">{"".join(meta)}</div>')
 
     if item["headline"]:
         parts.append(f"<h2>{linkify(item['headline'])}</h2>")
@@ -309,12 +351,21 @@ def render_card(item, images):
 
 def to_html(path, date):
     items = parse_items(body_lines(path))
+    parsed = [(item, *split_item(item)) for item in items]
 
-    urls = [url for item in items for _, url in LINK_RE.findall(" ".join(item["body"]))]
+    urls = [url for _, sources, _, _ in parsed for _, url in sources]
     images = resolve_images(urls)
 
-    cards = "\n".join(render_card(item, images) for item in items)
-    count = sum(1 for item in items if item["headline"])
+    cards, story_index = [], 0
+    for item, sources, what, sowhat in parsed:
+        if item["headline"]:
+            story_index += 1
+            idx = story_index
+        else:
+            idx = None
+        cards.append(render_card(item, sources, what, sowhat, images, idx))
+    cards = "\n".join(cards)
+    count = story_index
 
     return f"""<!DOCTYPE html>
 <html lang="en">
