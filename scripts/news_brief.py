@@ -114,7 +114,7 @@ Write a brief of {ITEMS} items. For each item give a bolded one-line headline, o
 Rules:
 - Favour argument over announcement. An essay that changes how the reader thinks is worth more than a funding round.
 - Prioritise substance over volume. If you cannot find {ITEMS} worthwhile items, give fewer and say so plainly rather than padding.
-- Link the source for each item.
+- Give the source as a markdown link on its own line at the end of the item, formatted exactly as [Publication Name](https://the-url) - not a bare URL. Use the actual publication or outlet name, not the domain.
 - Paraphrase in your own words. Do not quote at length.
 - Vary the threads across the brief rather than filling it from one.
 - Do not use semicolons.
