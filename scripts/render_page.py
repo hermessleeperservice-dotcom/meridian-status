@@ -95,11 +95,18 @@ body {
 .stamp .sep { opacity: 0.4; padding: 0 0.4em; }
 
 .card {
+  position: relative;
   background: var(--card);
   border: 1px solid var(--rule);
   border-radius: 14px;
   overflow: hidden;
   margin-bottom: 0.875rem;
+}
+
+.card-link {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
 }
 
 .shot {
@@ -111,7 +118,11 @@ body {
   border-bottom: 1px solid var(--rule);
 }
 
-.body { padding: 1rem 1.125rem 1.125rem; }
+.body {
+  position: relative;
+  z-index: 2;
+  padding: 1rem 1.125rem 1.125rem;
+}
 
 .meta {
   display: flex;
@@ -319,14 +330,16 @@ def render_card(item, sources, what, sowhat, images, index=None):
 
     parts = ['<article class="card">']
 
+    if first_url:
+        alt = esc(item["headline"] or "")
+        parts.append(
+            f'<a class="card-link" href="{esc(first_url)}" rel="noopener" '
+            f'aria-label="{alt}"></a>'
+        )
+
     if image:
         alt = esc(item["headline"] or "")
-        shot = f'<img class="shot" src="{esc(image)}" alt="{alt}" loading="lazy">'
-        parts.append(
-            f'<a href="{esc(first_url)}" rel="noopener">{shot}</a>'
-            if first_url
-            else shot
-        )
+        parts.append(f'<img class="shot" src="{esc(image)}" alt="{alt}" loading="lazy">')
 
     parts.append('<div class="body">')
 
