@@ -6,11 +6,6 @@ The page is noindex so it stays out of search results.
 Cards are image-led. The image is fetched from each source's own og:image
 tag, the same preview every link unfurl uses. A card without an image still
 renders, so a failed fetch degrades rather than breaks.
-
-Sources are normally written by the agent as a markdown link
-[Publication](https://...). Older/occasional output is a bare URL on its
-own line instead — that's still parsed: the source name falls back to the
-domain, and the URL still drives the image lookup and the "So what" link.
 """
 
 import html
@@ -21,14 +16,16 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from urllib.parse import urlparse
 
 BRIEFS_DIR = Path("briefs")
 OUT_DIR = Path("site")
 IMAGE_CACHE = BRIEFS_DIR / "images.json"
 
 LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^\)]+)\)")
-BARE_URL_RE = re.compile(r"https?://\S+")
-TRAILING_PUNCT = ".,;:'\")]"
+# The model sometimes drops a bare URL instead of a markdown link. Catch both,
+# otherwise the source is lost and with it the card image.
+BARE_URL_RE = re.compile(r"(?<![\(\]])\bhttps?://[^\s<>\)\]]+")
 OG_RE = re.compile(
     rb"""<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']""", re.I
 )
@@ -95,18 +92,11 @@ body {
 .stamp .sep { opacity: 0.4; padding: 0 0.4em; }
 
 .card {
-  position: relative;
   background: var(--card);
   border: 1px solid var(--rule);
   border-radius: 14px;
   overflow: hidden;
   margin-bottom: 0.875rem;
-}
-
-.card-link {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
 }
 
 .shot {
@@ -118,27 +108,7 @@ body {
   border-bottom: 1px solid var(--rule);
 }
 
-.body {
-  position: relative;
-  z-index: 2;
-  padding: 1rem 1.125rem 1.125rem;
-}
-
-.meta {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.num {
-  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.625rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  color: var(--signal);
-  flex-shrink: 0;
-}
+.body { padding: 1rem 1.125rem 1.125rem; }
 
 .source {
   font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -146,6 +116,8 @@ body {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
+  display: block;
+  margin-bottom: 0.5rem;
 }
 
 .card h2 {
@@ -242,11 +214,7 @@ def fetch_og_image(url):
     match = OG_RE.search(head) or OG_ALT_RE.search(head)
     if not match:
         return None
-    # The regex reads raw HTML without a parser, so entities in the
-    # attribute (some sites emit &amp; or &#x3D; inside og:image URLs)
-    # are still literal text here. Decode once so esc() doesn't
-    # re-escape them into garbage when the page is rendered.
-    image = html.unescape(match.group(1).decode("utf-8", "ignore")).strip()
+    image = match.group(1).decode("utf-8", "ignore").strip()
     return image if image.startswith("https://") else None
 
 
@@ -275,15 +243,6 @@ def linkify(text):
     return LINK_RE.sub(r'<a href="\2" rel="noopener">\1</a>', esc(text))
 
 
-def clean_url(url):
-    return url.rstrip(TRAILING_PUNCT)
-
-
-def domain_name(url):
-    host = re.sub(r"^https?://", "", url).split("/")[0]
-    return re.sub(r"^www\.", "", host)
-
-
 def parse_items(lines):
     """Group lines into items keyed off bolded headline lines."""
     items, current = [], None
@@ -301,19 +260,27 @@ def parse_items(lines):
     return items
 
 
+def label_for(url):
+    host = urlparse(url).netloc.lower()
+    return host[4:] if host.startswith("www.") else host
+
+
+def extract_sources(body):
+    """Pull sources whether written as markdown links or bare URLs."""
+    sources = list(LINK_RE.findall(body))
+    body = LINK_RE.sub(" ", body)
+
+    for url in BARE_URL_RE.findall(body):
+        url = url.rstrip(".,;:")
+        sources.append((label_for(url), url))
+    body = BARE_URL_RE.sub(" ", body)
+
+    return sources, re.sub(r"\s+", " ", body).strip(" /").strip()
+
+
 def split_item(item):
     body = " ".join(item["body"]).strip()
-
-    sources = LINK_RE.findall(body)
-    body = LINK_RE.sub("", body).strip(" /").strip()
-
-    if not sources:
-        # Fall back to bare URLs (e.g. "https://example.com/story") — the
-        # agent doesn't always wrap the source in markdown link syntax.
-        bare = [clean_url(u) for u in BARE_URL_RE.findall(body)]
-        if bare:
-            sources = [(domain_name(u), u) for u in bare]
-            body = BARE_URL_RE.sub("", body).strip()
+    sources, body = extract_sources(body)
 
     what, sowhat = body, ""
     match = re.search(r"\bSo what:\s*", body)
@@ -324,36 +291,31 @@ def split_item(item):
     return sources, what, sowhat
 
 
-def render_card(item, sources, what, sowhat, images, index=None):
+def render_card(item, images):
+    sources, what, sowhat = split_item(item)
+
     image = next((images.get(url) for _, url in sources if images.get(url)), None)
     first_url = sources[0][1] if sources else None
 
     parts = ['<article class="card">']
 
-    if first_url:
-        alt = esc(item["headline"] or "")
-        parts.append(
-            f'<a class="card-link" href="{esc(first_url)}" rel="noopener" '
-            f'aria-label="{alt}"></a>'
-        )
-
     if image:
         alt = esc(item["headline"] or "")
-        parts.append(f'<img class="shot" src="{esc(image)}" alt="{alt}" loading="lazy">')
+        shot = f'<img class="shot" src="{esc(image)}" alt="{alt}" loading="lazy">'
+        parts.append(
+            f'<a href="{esc(first_url)}" rel="noopener">{shot}</a>'
+            if first_url
+            else shot
+        )
 
     parts.append('<div class="body">')
 
-    meta = []
-    if index is not None:
-        meta.append(f'<span class="num">{index:02d}</span>')
     if sources:
         links = " / ".join(
             f'<a href="{esc(url)}" rel="noopener">{esc(name)}</a>'
             for name, url in sources
         )
-        meta.append(f'<span class="source">{links}</span>')
-    if meta:
-        parts.append(f'<div class="meta">{"".join(meta)}</div>')
+        parts.append(f'<span class="source">{links}</span>')
 
     if item["headline"]:
         parts.append(f"<h2>{linkify(item['headline'])}</h2>")
@@ -368,21 +330,16 @@ def render_card(item, sources, what, sowhat, images, index=None):
 
 def to_html(path, date):
     items = parse_items(body_lines(path))
-    parsed = [(item, *split_item(item)) for item in items]
 
-    urls = [url for _, sources, _, _ in parsed for _, url in sources]
+    urls = [
+        url
+        for item in items
+        for _, url in extract_sources(" ".join(item["body"]))[0]
+    ]
     images = resolve_images(urls)
 
-    cards, story_index = [], 0
-    for item, sources, what, sowhat in parsed:
-        if item["headline"]:
-            story_index += 1
-            idx = story_index
-        else:
-            idx = None
-        cards.append(render_card(item, sources, what, sowhat, images, idx))
-    cards = "\n".join(cards)
-    count = story_index
+    cards = "\n".join(render_card(item, images) for item in items)
+    count = sum(1 for item in items if item["headline"])
 
     return f"""<!DOCTYPE html>
 <html lang="en">
