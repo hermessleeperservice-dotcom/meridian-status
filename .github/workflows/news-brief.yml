@@ -2,7 +2,7 @@ name: Weekly news brief
 
 on:
   schedule:
-    - cron: '0 18 * * 0'
+    - cron: '0 5 * * *'
   workflow_dispatch:
 
 permissions:
