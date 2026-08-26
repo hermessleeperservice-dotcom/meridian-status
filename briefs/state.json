@@ -1,5 +1,5 @@
 {
-  "runs": 6,
+  "runs": 7,
   "covered": [
     "AI Growth Lab sandbox opens its first cohort while the Bill itself stalls in Parliament",
     "Tesco pilots AI agent that plans meals and builds baskets automatically",
@@ -16,6 +16,14 @@
     "Lenny's second annual sentiment survey finds tech's workforce splitting in two over AI",
     "The ICO signals a statutory AI code and dedicated agentic-AI guidance are coming",
     "Hotel loyalty moves from segment-level offers to individual-level AI personalisation",
-    "A rebuttal to the \"95% of AI pilots fail\" number reframes the real lesson as build-versus-buy"
+    "A rebuttal to the \"95% of AI pilots fail\" number reframes the real lesson as build-versus-buy",
+    "Design's core problem is \"legibility,\" not budget",
+    "Engineering leaders are quitting the jobs everyone else wants",
+    "Incentives, not technology, decide who wins the agentic era",
+    "Brussels starts actually enforcing the AI Act",
+    "AI winning the A/B test isn't the same as AI being the right call",
+    "Airline loyalty AI amplifies whatever the programme already optimises for",
+    "A satirist's brush with AI-personalised scam mail reframes the trust problem",
+    "A roadmap essay for AI governance treats \"no plan\" as the real risk"
   ]
 }
