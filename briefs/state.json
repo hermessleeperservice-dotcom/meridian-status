@@ -1,5 +1,5 @@
 {
-  "runs": 10,
+  "runs": 11,
   "covered": [
     "AI Growth Lab sandbox opens its first cohort while the Bill itself stalls in Parliament",
     "Tesco pilots AI agent that plans meals and builds baskets automatically",
@@ -24,6 +24,14 @@
     "AI winning the A/B test isn't the same as AI being the right call",
     "Airline loyalty AI amplifies whatever the programme already optimises for",
     "A satirist's brush with AI-personalised scam mail reframes the trust problem",
-    "A roadmap essay for AI governance treats \"no plan\" as the real risk"
+    "A roadmap essay for AI governance treats \"no plan\" as the real risk",
+    "Legibility gets a mechanism: predictability, not just visibility, is what design lacks",
+    "A Google AI exec bets against the mass white-collar wipeout thesis",
+    "A tech journalist tries to hand his own job to an agent, and reports back",
+    "A frontier-lab insider predicts Anthropic's open culture won't survive its IPO",
+    "Meta's layoffs triggered a resignation wave that money isn't fixing",
+    "The UK's automated-decision code has a firm date now, and a wider net than expected",
+    "Younger travellers are shrugging off points, and AI is being aimed at the gap",
+    "A leading AI optimist writes the essay he doesn't want to be right about"
   ]
 }
