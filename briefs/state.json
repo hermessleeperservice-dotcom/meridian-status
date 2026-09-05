@@ -1,5 +1,5 @@
 {
-  "runs": 17,
+  "runs": 18,
   "covered": [
     "AI Growth Lab sandbox opens its first cohort while the Bill itself stalls in Parliament",
     "Tesco pilots AI agent that plans meals and builds baskets automatically",
@@ -32,6 +32,12 @@
     "Meta's layoffs triggered a resignation wave that money isn't fixing",
     "The UK's automated-decision code has a firm date now, and a wider net than expected",
     "Younger travellers are shrugging off points, and AI is being aimed at the gap",
-    "A leading AI optimist writes the essay he doesn't want to be right about"
+    "A leading AI optimist writes the essay he doesn't want to be right about",
+    "AI agents need to know when to look up",
+    "Anthropic drops its Fable data-retention rule under enterprise pressure",
+    "A reframe of the Hugging Face hack as evidence of an emerging AI hive mind",
+    "AI's uneven acceleration: cyber surges, maths barely moves",
+    "Delta's AI assistant blurs pricing, loyalty and service recovery into one system",
+    "Design systems: three disciplined engineers now beat ten undirected ones"
   ]
 }
